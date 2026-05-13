@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NFC Surprise</title>
+</head>
+<body>
+    <audio id="prankAudio" loop>
+        <source src="https://raw.githubusercontent.com/matveisem4-dot/prank/main/stony.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Функция запуска
+        function startPrank() {
+            var audio = document.getElementById("prankAudio");
+            audio.volume = 1.0; // Громкость на всю
+            audio.play();
+        }
+
+        // Пытаемся запустить сразу при клике или любом взаимодействии
+        window.onclick = function() { startPrank(); };
+        window.onload = function() { 
+            // Современные браузеры блокируют автозвук без клика, 
+            // поэтому сайт будет ждать первого касания экрана другом
+            alert("Нажми ОК, чтобы продолжить"); 
+            startPrank();
+        };
+    </script>
+    <h1 style="text-align: center; margin-top: 20%;">Загрузка...</h1>
+</body>
+</html>
