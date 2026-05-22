@@ -2,55 +2,44 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Service</title>
-    <style>
-        body {
-            background-color: #000;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        /* Та самая круглая кнопка без надписей */
-        .btn {
-            width: 200px;
-            height: 200px;
-            background-color: #333;
-            border: 5px solid #444;
-            border-radius: 50%;
-            cursor: pointer;
-            outline: none;
-            transition: background-color 0.2s;
-        }
-        .btn:active {
-            background-color: #555;
-        }
-    </style>
+    <title>Печать из HTML</title>
 </head>
 <body>
-
-    <button class="btn" onclick="boostAndPlay()"></button>
-
-    <audio id="prankAudio" loop>
-        <source src="https://soundinstants.com/storage/sounds/stony-777.mp3" type="audio/mpeg">
-    </audio>
+    <button onclick="printViaBluetooth()">Распечатать текст</button>
 
     <script>
-        function boostAndPlay() {
-            const audio = document.getElementById('prankAudio');
+    async function printViaBluetooth() {
+        try {
+            // 1. Запрашиваем Bluetooth-устройство (ищем стандартный протокол печати)
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Стандартный UUID для принтеров
+            });
+
+            // 2. Подключаемся к серверу GATT
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
             
-            // Выкручиваем громкость в плеере на 1.0 (максимум)
-            audio.volume = 1.0; 
+            // Получаем характеристику для записи данных
+            const characteristics = await service.getCharacteristics();
+            const characteristic = characteristics[0]; 
+
+            // 3. Формируем данные (Команда ESC/POS + текст)
+            const encoder = new TextEncoder('cp866'); // Кодировка для русского языка
             
-            // Запускаем воспроизведение
-            audio.play().catch(e => console.log("Ошибка воспроизведения:", e));
-            
-            // Можно добавить визуальный эффект после нажатия, чтобы было понятно, что сработало
-            document.querySelector('.btn').style.borderColor = "#ff0000";
+            // Инициализация принтера (\x1b\x40) и текст с переносом строки (\n)
+            const initCmd = new Uint8Array([0x1B, 0x40]);
+            const textData = new TextEncoder().encode("Hello World!\nTest Print\n\n\n");
+
+            // 4. Отправляем на принтер
+            await characteristic.writeValue(initCmd);
+            await characteristic.writeValue(textData);
+
+            alert("Данные успешно отправлены на печать!");
+        } catch (error) {
+            console.error(error);
+            alert("Ошибка подключения или печати: " + error.message);
         }
+    }
     </script>
 </body>
 </html>
