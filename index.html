@@ -9,37 +9,56 @@
 
     <script>
     async function printViaBluetooth() {
+    try {
+        console.log("Запуск поиска устройств...");
+        
+        // 1. Снимаем фильтры и разрешаем показ ВСЕХ устройств вокруг
+        // Но при этом ОБЯЗАТЕЛЬНО указываем сервисы, к которым планируем обращаться
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [
+                '000018f0-0000-1000-8000-00805f9b34fb', // Стандартный сервис принтеров 1
+                '0000ff00-0000-1000-8000-00805f9b34fb', // Сервис для многих китайских плат
+                '49535343-fe7d-4ae5-8fa9-9fafd205e455'  // Популярный чипсет ISSC
+            ]
+        });
+
+        console.log("Устройство выбрано:", device.name);
+
+        // 2. Подключение к принтеру
+        const server = await device.gatt.connect();
+        
+        // Пытаемся найти первичный сервис из списка поддерживаемых
+        let service;
         try {
-            // 1. Запрашиваем Bluetooth-устройство (ищем стандартный протокол печати)
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Стандартный UUID для принтеров
-            });
-
-            // 2. Подключаемся к серверу GATT
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            
-            // Получаем характеристику для записи данных
-            const characteristics = await service.getCharacteristics();
-            const characteristic = characteristics[0]; 
-
-            // 3. Формируем данные (Команда ESC/POS + текст)
-            const encoder = new TextEncoder('cp866'); // Кодировка для русского языка
-            
-            // Инициализация принтера (\x1b\x40) и текст с переносом строки (\n)
-            const initCmd = new Uint8Array([0x1B, 0x40]);
-            const textData = new TextEncoder().encode("Hello World!\nTest Print\n\n\n");
-
-            // 4. Отправляем на принтер
-            await characteristic.writeValue(initCmd);
-            await characteristic.writeValue(textData);
-
-            alert("Данные успешно отправлены на печать!");
-        } catch (error) {
-            console.error(error);
-            alert("Ошибка подключения или печати: " + error.message);
+            service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        } catch(e) {
+            // Если первый UUID не подошел, пробуем альтернативный китайский
+            service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
         }
+        
+        const characteristics = await service.getCharacteristics();
+        // Берем первую характеристику, которая поддерживает запись (WRITE)
+        const characteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+
+        if (!characteristic) {
+            throw new Error("Не найдена характеристика для отправки данных.");
+        }
+
+        // 3. Отправка тестовых байтов (Печать)
+        const initCmd = new Uint8Array([0x1B, 0x40]); // ESC @ (Инициализация)
+        const textData = new TextEncoder().encode("Hello from HTML!\n\n\n");
+
+        await characteristic.writeValue(initCmd);
+        await characteristic.writeValue(textData);
+
+        alert("Успешно распечатано!");
+
+    } catch (error) {
+        console.error("Детали ошибки:", error);
+        alert("Ошибка: " + error.message);
     }
+}
     </script>
 </body>
 </html>
